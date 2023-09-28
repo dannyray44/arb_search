@@ -1,0 +1,10 @@
+{
+    "rapid-api": "your_rapid_api_key",
+    "the-odds-api": "your_the_odds_api_key",
+    "betfair_api": {
+        "username": "username_or_email",
+        "password": "betfair_password",
+        "app_key": "betfair_app_key",
+        "certs": "path/to/your/betfair/certs/folder"
+    }
+}

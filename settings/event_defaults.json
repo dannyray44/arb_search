@@ -1,0 +1,16 @@
+{
+    "event": {
+        "wager_limit": -1.0,
+        "wager_precision": 0.01
+    },
+    "bookmaker": {
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "bet": {
+        "previous_wager": 0.0
+    }
+}

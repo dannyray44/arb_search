@@ -1,0 +1,146 @@
+{
+    "betfair_ex_uk": {
+        "name": "betfair_ex_uk",
+        "commission": 0.02,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": true,
+        "max_wager_count": -1
+    },
+    "sport888": {
+        "name": "sport888",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "betfair_sb_uk": {
+        "name": "betfair_sb_uk",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "paddypower": {
+        "name": "paddypower",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "betway": {
+        "name": "betway",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "livescorebet": {
+        "name": "livescorebet",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "virginbet": {
+        "name": "virginbet",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "unibet_uk": {
+        "name": "unibet_uk",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "leovegas": {
+        "name": "leovegas",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "mrgreen": {
+        "name": "mrgreen",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "casumo": {
+        "name": "casumo",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "skybet": {
+        "name": "skybet",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "betvictor": {
+        "name": "betvictor",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "coral": {
+        "name": "coral",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "ladbrokes_uk": {
+        "name": "ladbrokes_uk",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "matchbook": {
+        "name": "matchbook",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "boylesports": {
+        "name": "boylesports",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    },
+    "williamhill": {
+        "name": "williamhill",
+        "commission": 0.0,
+        "balance": -1.0,
+        "percent_of_balance": 1.0,
+        "ignore_wager_precision": false,
+        "max_wager_count": -1
+    }
+}

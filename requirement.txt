@@ -1,0 +1,2 @@
+betfairlightweight==2.17.0
+betting-event @ git+https://github.com/dannyray44/betting_event

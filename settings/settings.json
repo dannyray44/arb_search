@@ -1,0 +1,7 @@
+{
+    "apis":{
+        "betfair": {
+            "default_hours_range": 24
+        }
+    }
+}

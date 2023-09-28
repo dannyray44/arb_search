@@ -1,0 +1,8 @@
+{
+    "the-odds-api": {
+        "regions": ["uk"],
+        "markets": ["h2h", "spreads", "totals"],
+        "dateFormat": "iso",
+        "oddsFormat": "decimal"
+    }
+}

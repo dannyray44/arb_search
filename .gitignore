@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Distribution / packaging
+dist/
+build/
+eggs/
+*.egg-info/
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# macOS metadata
+.DS_Store
+
+# Virtual environment
+.env/
+venv/
+
+# IDE files
+.idea/
+.vscode/
+
+# Private data
+settings/api_keys.json
+*betfair_certs*
+storage/*
+results/*
