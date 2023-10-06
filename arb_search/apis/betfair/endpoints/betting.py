@@ -1,13 +1,14 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from time import sleep
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 import requests
 from betfairlightweight import metadata, resources
 from betfairlightweight.endpoints import Betting
 from betfairlightweight.filters import market_filter
 from betfairlightweight.metadata import list_market_book
-
+from ..utils import price_projection_weight
 
 class Betting_Limitless(Betting):
 
@@ -64,26 +65,57 @@ class Betting_Limitless(Betting):
 
         return list(results.values())
 
-    # def list_all_market_book_for_UserEvent(
-    #         self,
-    #         market_ids: list,
-    #         price_projection: Optional[dict] = None,
-    #         order_projection: Optional[str] = None,
-    #         match_projection: Optional[str] = None,
-    #         include_overall_position: Optional[bool] = None,
-    #         partition_matched_by_strategy_ref: Optional[bool] = None,
-    #         customer_strategy_refs: Optional[list] = None,
-    #         currency_code: Optional[str] = None,
-    #         matched_since: Optional[str] = None,
-    #         bet_ids: Optional[list] = None,
-    #         locale: Optional[str] = None,
-    #         session: Optional[requests.Session] = None,
-    #         lightweight: Optional[bool] = None
-    #     ) -> Union[list, List[resources.MarketBook]]:
+    def list_all_market_book(
+            self,
+            market_id_runners_table: Dict[str, int],
+            price_projection: Optional[dict] = None,
+            order_projection: Optional[str] = None,
+            match_projection: Optional[str] = None,
+            include_overall_position: Optional[bool] = None,
+            partition_matched_by_strategy_ref: Optional[bool] = None,
+            customer_strategy_refs: Optional[list] = None,
+            currency_code: Optional[str] = None,
+            matched_since: Optional[str] = None,
+            bet_ids: Optional[list] = None,
+            locale: Optional[str] = None,
+            session: Optional[requests.Session] = None,
+            lightweight: bool = True
+        ) -> Dict[str, dict]:
+        results = {}
 
-    #     weight = self.price_projection_weight(price_projection)
-    #     chunk_size = 200 // weight
+        weight = price_projection_weight(price_projection)
+        chunk_size = 200 // weight
 
-    #     results = super().list_market_book(market_ids, price_projection, order_projection, match_projection, include_overall_position, partition_matched_by_strategy_ref, customer_strategy_refs, currency_code, matched_since, bet_ids, locale, session, lightweight)
+        with ThreadPoolExecutor() as executor:
+            futures = []
 
+            for market_ids in self._market_and_runner_limiter(market_id_runners_table, chunk_size):
+                futures.append(executor.submit(super().list_market_book, market_ids, price_projection, order_projection, match_projection, include_overall_position, partition_matched_by_strategy_ref, customer_strategy_refs, currency_code, matched_since, bet_ids, locale, session, lightweight))
+
+            for future in as_completed(futures):
+                market_books = future.result()
+                results.update({market_book['marketId']: market_book for market_book in market_books})
+
+        return results
+
+    @staticmethod
+    def _market_and_runner_limiter(market_id_runners_table: Dict[str, int], max_market_count: int, max_runners: int = 250) -> Iterator[List[str]]:
+        market_count = 0
+        runner_count = 0
+
+        market_ids: List[str] = []
+
+        for market_id, market_runners_count in market_id_runners_table.items():
+            market_count += 1
+            runner_count += market_runners_count
+            if market_count >= max_market_count or market_runners_count >= max_runners:
+                yield market_ids
+                market_count = 1
+                runner_count = market_runners_count
+                market_ids = []
+
+            market_ids.append(market_id)
+
+        if market_ids:
+            yield market_ids
 

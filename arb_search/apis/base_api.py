@@ -20,7 +20,7 @@ class BaseAPI(ABC):
         pass
 
     @abstractmethod
-    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> UserEvent:
+    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> bool:
         pass
 
     @abstractmethod

@@ -1,15 +1,12 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Type
 
 from betting_event import Event
 
-# from ..apis.base_api import API_Instance, BaseAPI
 from . import UserBet, UserBookmaker
 
-# from arb_search.apis.base_api import API_Instance
-
-
+_rapid_api_key = json.load(open("settings/api_keys.json", "r"))["rapid-api"]
 
 class UserEvent(Event):
     _BOOKMAKER_CLASS = UserBookmaker
@@ -36,6 +33,7 @@ class UserEvent(Event):
 
         self.bets: List[UserBet]
         self.bookmakers: List[UserBookmaker]
+        self.score: float = 0
 
     def update_from_event(self, __new_event: 'UserEvent', api: 'API_Instance') -> 'UserEvent':
         current_bet_indexes = list(range(len(self.bets)))
@@ -57,3 +55,56 @@ class UserEvent(Event):
                 del self.bets[i]
 
         return self
+
+    def calculate_score(self) -> float:
+        """Calculate the score of the event. Score is determined by the profit and the time to the start of the event."""
+        if self.start_time is None:
+            raise RuntimeError("Event has no start time")
+        finish_time = self.start_time + timedelta(minutes= 100)
+        time_to_finish = finish_time - datetime.now()
+        repeatability = timedelta(days=1) / time_to_finish
+
+        total_exposure = 0.0
+        for bet in self.bets:
+            if bet.lay:
+                total_exposure += bet.wager * (bet.odds - 1)
+            else:
+                total_exposure += bet.wager
+
+        if total_exposure != 0:
+            profit_percent = 1 + (self.profit[0] / total_exposure)
+            min_score = profit_percent ** repeatability
+            # max_score = self.profit[1] ** repeatability
+        else:
+            min_score = 0.0
+
+        self.score = min_score
+        return self.score
+
+    def get_name(self) -> str:
+        """Get the name of the event."""
+        api = list(self.api_specific_data.keys())[0]
+        return " v ".join(api.read_event_comparison_data(self)[1:3]).replace('/', '-')
+
+    def send_to_RapidAPI(self, api_key: str= _rapid_api_key, volume_percentage: float = 1.0) -> Event:
+        for bet in self.bets:
+            if bet.volume <= 0 or isinstance(bet.volume, str):
+                continue
+            bet.volume *= volume_percentage
+
+        result = super().send_to_RapidAPI(api_key)
+
+        for bet in self.bets:
+            bet.volume /= volume_percentage
+        
+        return result
+
+    def process(self) -> None:
+
+        self.send_to_RapidAPI()
+        self.calculate_score()
+        if self.score == 0:
+            return
+
+        for _ in range(3):
+            pass

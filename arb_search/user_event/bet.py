@@ -27,6 +27,7 @@ class UserBet(Bet):
         if api_specific_data is None:
             api_specific_data = {}
         self.api_specific_data: Dict[API_Instance, Dict[str, Any]] = api_specific_data    # type: ignore
+        self.bookmaker: UserBookmaker
 
     def update_from_bet(self, __new_bet: 'UserBet') -> 'UserBet':
         assert self.bookmaker == __new_bet.bookmaker
@@ -46,3 +47,9 @@ class UserBet(Bet):
                     self.api_specific_data[key] = value
 
         return self
+    
+    def as_dict(self, verbose: bool = False) -> dict:
+        result = super().as_dict()
+        if verbose:
+            result["bookmaker"]= self.bookmaker.name
+        return result

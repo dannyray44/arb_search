@@ -36,27 +36,15 @@ class API_Handler:
 
 
         return self.match_events(apis_events)
-    
-    # def gather_all_sport_type(self, sport_types: List[SportType], gather_new_leagues: bool = False) -> List[UserEvent]:
-    #     apis_events: Dict[API_Instance, List[UserEvent]] = {}
 
-    #     def gather_events(api: API_Instance, league_names: Optional[List[str]]) -> None:
-    #         apis_events[api] = api.gather_events(sport_types=sport_types, leagues=league_names)
 
-    #     threads = []
-    #     for api in self.apis:
-    #         league_names = list(self.name_comparison_table[api.name]["league_names"].values())
-    #         if gather_new_leagues:
-    #             league_names = None
+    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> bool:
+        recalculation_needed = False
+        for api in event.api_specific_data.keys():
+            recalculation_needed |= api.update_bet_data(event, bet_indexes)
 
-    #         thread = threading.Thread(target=gather_events, args=(api, league_names))
-    #         threads.append(thread)
-    #         thread.start()
+        return recalculation_needed
 
-    #     for thread in threads:
-    #         thread.join()
-
-    #     return self.match_events(apis_events)
 
     def match_events(self, apis_events: Dict[API_Instance, List[UserEvent]]) -> List[UserEvent]:
         apis_list = list(apis_events.keys())

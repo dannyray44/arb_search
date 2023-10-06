@@ -1,5 +1,6 @@
 import json
-import re
+import threading
+from time import sleep
 from datetime import datetime, timedelta
 from os import path
 from typing import Dict, Iterator, List, Optional, Tuple, Union
@@ -87,7 +88,6 @@ class Betfair(BaseAPI, APIClient):
         markets = self.betting.list_all_market_catalogue(filter=market_filter, market_projection=['EVENT', 'COMPETITION', 'RUNNER_DESCRIPTION'])
 
         for market in markets:
-            print(end='.')
             if not market["event"]["id"] in events_table:
                 events_table[market["event"]["id"]] = UserEvent(start_time= betfair_to_datetime(market["event"]["openDate"]),
                                                           bookmakers= [self.bookmaker_table[self.bookmaker_name]],
@@ -106,37 +106,69 @@ class Betfair(BaseAPI, APIClient):
 
             events_table[market["event"]["id"]].api_specific_data[self]["total_runner_count"] += len(market["runners"])
 
- 
         return self.update_events(list(events_table.values()))
 
-    
-    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> UserEvent:
-        raise NotImplementedError('still needs odds gathering')
+    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> bool:
+        new_bets: List[UserBet] = []
+        bet_indexes.sort()
+        updates_needed = False
+        bets = [event.bets[index] for index in bet_indexes]
+        market_books = self.betting.list_market_book(
+            [bet.api_specific_data[self]["market_id"] for bet in bets if self in bet.api_specific_data and "market_id" in bet.api_specific_data[self]],
+            price_projection= price_projection(price_data=['EX_BEST_OFFERS']),
+            order_projection= 'EXECUTABLE')
+        
+        for market_book in market_books:
+            for current_runner, new_runner in zip(event.api_specific_data[self]["markets"][market_book['marketId']]["runners"], market_book["runners"]):
+                assert current_runner["selectionId"] == new_runner["selectionId"]
+                new_runner.update(current_runner)
+            new_bets.extend(self._build_bets(event, market_book)) # type: ignore
+        
+        
+        for old_index in bet_indexes[::-1]:
+            old_bet = event.bets[old_index]
+            if old_bet not in new_bets:
+                updates_needed = True
+                event.bets.remove(old_bet)
+            else:
+                new_bet = new_bets[new_bets.index(old_bet)]
+                new_bet.wager = old_bet.wager
+                new_bet.previous_wager = old_bet.previous_wager
+                if old_bet.wager > new_bet.volume:
+                    updates_needed = True
+                event.add_bet(new_bet)
+
+        return updates_needed
 
     def update_events(self, events: List[UserEvent]) -> List[UserEvent]:
-        
-        events_table: Dict[str, UserEvent] = {event.api_specific_data[self]["id"]: event for event in events}
         price_projection_dict = price_projection(price_data=['EX_BEST_OFFERS'])
-        max_markets_per_request = 200 // price_projection_weight(price_projection_dict)
+        market_id_runners_table: Dict[str, int] = {}
 
-        for event_market_ids in self._market_and_runner_limiter(list(events_table.values()), max_markets_per_request, 250):
-            market_books = self.betting.list_market_book(
-                    [market_id for market_ids in event_market_ids.values() for market_id in market_ids],
-                    price_projection= price_projection_dict, order_projection= 'EXECUTABLE'
-                )
+        for event in events:
+            for market_id in event.api_specific_data[self]["markets"].keys():
+                market_id_runners_table[market_id] = event.api_specific_data[self]["total_runner_count"]
 
-            for market_book in market_books:
-                for event_id in event_market_ids:
-                    if market_book['marketId'] in event_market_ids[event_id]:
-                        for current_runner, new_runner in zip(events_table[event_id].api_specific_data[self]["markets"][market_book['marketId']]["runners"], market_book["runners"]):
-                            assert current_runner["selectionId"] == new_runner["selectionId"]
-                            new_runner.update(current_runner)
-                        self._build_and_add_bets(events_table[event_id], market_book)
-            print(end=',')
+        all_market_books = self.betting.list_all_market_book(market_id_runners_table, price_projection= price_projection_dict, order_projection= 'EXECUTABLE', lightweight= True)
 
-        return list(events_table.values())
+        for event in events:
+            new_bets = []
+            for market_id in event.api_specific_data[self]["markets"].keys():
+                market_book = all_market_books.pop(market_id)
+                for current_runner, new_runner in zip(event.api_specific_data[self]["markets"][market_book['marketId']]["runners"], market_book["runners"]):
+                    assert current_runner["selectionId"] == new_runner["selectionId"]
+                    new_runner.update(current_runner)
+                # for new_bet in self._build_bets(event, market_book):
+                #     event.add_bet(new_bet)
+                new_bets.extend(self._build_bets(event, market_book))
+
+            if event.bets == []:
+                event.bets = new_bets
+            else:
+                for new_bet in new_bets:
+                    event.add_bet(new_bet)
+
+        return events
     
-
     def read_event_comparison_data(self, event: UserEvent) -> Tuple[str, str, str, str]:
         result = [self.name]
         result += [name.strip() for name in event.api_specific_data[self]["name"].split(' v ')]
@@ -145,31 +177,8 @@ class Betfair(BaseAPI, APIClient):
             raise ValueError("Expected 4 values in result, but got {}".format(len(result)))
         return tuple(result) # type: ignore
 
-    def _market_and_runner_limiter(self, events: List[UserEvent], max_market_count: int, max_runners: int = 250) -> Iterator[Dict[str, List[str]]]:
-        market_count = 0
-        runner_count = 0
-        market_ids: Dict[str, List[str]] = {}
-        for event in events:
-            
-            for market_id, market_data in event.api_specific_data[self]["markets"].items():
-                market_count += 1
-                runner_count += len(market_data["runners"])
-                if market_count >= max_market_count or runner_count >= max_runners:
-                    yield market_ids
-                    market_count = 1
-                    runner_count = len(market_data["runners"])
-                    market_ids = {}
-
-                if event.api_specific_data[self]["id"] not in market_ids:
-                    market_ids[event.api_specific_data[self]["id"]] = []
-
-                market_ids[event.api_specific_data[self]["id"]].append(market_id)
-        
-        if market_ids:
-            yield market_ids
-
-    def _build_and_add_bets(self, event: UserEvent, market_book: dict) -> None:
-
+    def _build_bets(self, event: UserEvent, market_book: dict) -> List[UserBet]:
+        bets_list = []
         market_data = event.api_specific_data[self]["markets"][market_book['marketId']]
 
         _home_team, _away_team = event.api_specific_data[self]["name"].split(' v ')
@@ -207,8 +216,6 @@ class Betfair(BaseAPI, APIClient):
             bet_type = BetType.AsianHandicap
             bet_values = [f'{team_table[team_name_matcher(runner["runnerName"], team_names)]} {runner["handicap"]}' for runner in market_data["runners"]]
             # remove values that start with "draw"
-            if any(bet_value.startswith("draw") for bet_value in bet_values):
-                print()
             bet_value = [value for value in bet_values if not value.startswith("draw")] # TODO: figure out how to implement this for betfair
 
         elif market_data["marketName"] == "Both teams to Score?":
@@ -231,8 +238,8 @@ class Betfair(BaseAPI, APIClient):
             bet_type = BetType.Result_OverUnder
             bet_values = [f'{team_table[team_name_matcher(runner["runnerName"][:runner["runnerName"].index("/")].lower(), team_names)]}/{runner["runnerName"][runner["runnerName"].index("/") + 1:-6].lower()}' for runner in market_data["runners"]]
 
-        elif market_data["marketName"].startswith(_home_team) or market_data["marketName"].startswith(_away_team):
-            if market_data["marketName"].startswith(_home_team):
+        elif market_data["marketName"].lower().startswith(_home_team.lower()) or market_data["marketName"].lower().startswith(_away_team.lower()):
+            if market_data["marketName"].lower().startswith(_home_team.lower()):
                 rest_of_name = market_data["marketName"][len(_home_team) + 1:]
                 team = "home"
             else:
@@ -247,21 +254,18 @@ class Betfair(BaseAPI, APIClient):
                 bet_type = BetType.Team_WinToNil
                 bet_values = [f'{team} {runner["runnerName"].lower()}' for runner in market_data["runners"]]
 
-            else: 
-                print(market_data["marketName"])
+            else:
                 raise ValueError(f"Unknown market type '{market_data['marketName']}'")
 
         else:
-            print(market_data["marketName"])
             raise ValueError(f"Unknown market type '{market_data['marketName']}'")
-
 
         for runner_index, (bet_value, ex) in enumerate(zip(bet_values, [runner["ex"] for runner in market_book["runners"]])):
             for market_key in ex:
                 if market_key not in ["availableToBack", "availableToLay"]:
                     continue    #TODO: add previous_wager here
                 for price in ex[market_key]:
-                    event.add_bet(
+                    bets_list.append(
                         UserBet(
                             bet_type= bet_type,
                             value= bet_value,
@@ -278,19 +282,4 @@ class Betfair(BaseAPI, APIClient):
                         )
                     )
 
-        print(end='')
-
-
-    # def _build_runner_count_table(self, events: List[UserEvent]) -> Dict[int, List[str]]:
-    #     table: Dict[int, List[str]] = {}
-
-    #     for event in events:
-    #         if event.api_specific_data is None or self not in event.api_specific_data or "total_runner_count" not in event.api_specific_data[self]:
-    #             raise ValueError(f"Error trying to gather event.api_specific_data[self]['total_runner_count'] for event {event}")
-            
-    #         for market_id, market_value in event.api_specific_data[self]["markets"].items():
-    #             if market_value["runner_count"] not in table:
-    #                 table[market_value["runner_count"]] = []
-    #             table[market_value["runner_count"]].append(market_id)
-
-    #     return table
+        return bets_list

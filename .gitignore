@@ -22,7 +22,7 @@ eggs/
 
 # Virtual environment
 .env/
-venv/
+.venv/
 
 # IDE files
 .idea/
@@ -33,3 +33,5 @@ settings/api_keys.json
 *betfair_certs*
 storage/*
 results/*
+errors/*
+unprocessed/*

@@ -8,7 +8,8 @@
         "balance": -1.0,
         "percent_of_balance": 1.0,
         "ignore_wager_precision": false,
-        "max_wager_count": -1
+        "max_wager_count": -1,
+        "lowest_valid_wager": 0.01
     },
     "bet": {
         "previous_wager": 0.0

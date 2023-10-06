@@ -52,10 +52,11 @@ class TheOddsAPI_V4(BaseAPI):
                     json.dump(result, f, indent=2)
 
                 if 'x-requests-used' in response.headers:
-                    self.requests_used = int(response.headers['x-requests-used'])
+                    self.requests_used = int(round(float(response.headers['x-requests-used'])))
                 if 'x-requests-remaining' in response.headers:
-                    if self.requests_remaining != int(response.headers['x-requests-remaining']):
-                        self.requests_remaining = int(response.headers['x-requests-remaining'])
+                    remaining_requests = int(round(float(response.headers['x-requests-remaining'])))
+                    if self.requests_remaining != remaining_requests:
+                        self.requests_remaining = remaining_requests
                         print(f'{self.requests_remaining} requests remaining')
 
         return result
@@ -85,7 +86,7 @@ class TheOddsAPI_V4(BaseAPI):
     def _get_event_odds(self, sport_key: str, event_id: str, force_update: bool = False, params: Optional[dict] = None) -> dict:
         """Get odds data for a specific event.
         [Additional markets](https://the-odds-api.com/sports-odds-data/betting-markets.html#additional-markets)
-        are only permitted through this endpoint.
+        can only be gathered through this endpoint.
         
         Args:
             sport_key (str): The sport ID.
@@ -173,9 +174,20 @@ class TheOddsAPI_V4(BaseAPI):
     def update_events(self, events: List[UserEvent]) -> List[UserEvent]:
        raise NotImplementedError
     
-    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> UserEvent:
-        raise NotImplementedError
+    def update_bet_data(self, event: UserEvent, bet_indexes: List[int]) -> bool:
+        bets = [event.bets[i] for i in bet_indexes if hasattr(event.bets[i], 'api_specific_data') and self in event.bets[i].api_specific_data]
+        if not bets:
+            return False
 
+        params = self.default_params.copy()
+        params["markets"] = list(set(bet.api_specific_data[self]['market_key'] for bet in bets))
+        odds = self._get_event_odds(event.api_specific_data[self]['sport_key'], event.api_specific_data[self]['id'], params=params, force_update=True)
+
+        new_bets = self._build_bets(odds)
+
+        print()
+
+        return False
 
     def gather_events(self, sport_types: List[SportType], leagues: Optional[List[str]] = None, force_update: int = 0) -> List[UserEvent]:   #TODO: change force_update to 1
         available_sports = self._get_sports(force_update= (force_update >= 2))
@@ -207,6 +219,12 @@ class TheOddsAPI_V4(BaseAPI):
 
     def _build_event(self, response: dict) -> UserEvent:
         compatible_event: UserEvent = UserEvent(start_time= datetime.fromisoformat(response['commence_time'].replace('Z', '')))
+        compatible_event.add_bets(self._build_bets(response))
+        compatible_event.api_specific_data[self] = self.extract_specific_data(response)
+        return compatible_event
+
+    def _build_bets(self, response: dict) -> List[UserBet]:
+        bets = []
 
         for bookmaker in response["bookmakers"]:
             if bookmaker["key"] not in self.bookmaker_table:
@@ -227,26 +245,25 @@ class TheOddsAPI_V4(BaseAPI):
                         else:
                             raise Exception(f'Unknown outcome: {outcome}')
 
-                        compatible_event.add_bet(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
-                                                         bookmaker= self.bookmaker_table[bookmaker['key']],
-                                                         lay= (market['key'] == 'h2h_lay'), update_time= update_time,
-                                                         api_specific_data= {self: outcome}))
+                        bets.append(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
+                                            bookmaker= self.bookmaker_table[bookmaker['key']], lay= (market['key'] == 'h2h_lay'),
+                                            update_time= update_time, api_specific_data= {self: {**outcome, **{'market_key': market['key']}}}))
 
                 elif market['key'] == 'totals' or market['key'] == 'alternate_totals':
                     bet_type = BetType.Goals_OverUnder
                     for outcome in market['outcomes']:
                         value = outcome['name'].lower() + ' ' + str(outcome['point'])
-                        compatible_event.add_bet(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
-                                                                    bookmaker= self.bookmaker_table[bookmaker['key']],
-                                                                    update_time= update_time, api_specific_data= {self: outcome}))
+                        bets.append(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
+                                            bookmaker= self.bookmaker_table[bookmaker['key']], update_time= update_time,
+                                            api_specific_data= {self: {**outcome, **{'market_key': market['key']}}}))
 
                 elif market['key'] == 'btts':
                     bet_type = BetType.BothTeamsToScore
                     for outcome in market['outcomes']:
                         value = outcome['name'].lower()
-                        compatible_event.add_bet(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
-                                                                    bookmaker= self.bookmaker_table[bookmaker['key']],
-                                                                    update_time= update_time, api_specific_data= {self: outcome}))
+                        bets.append(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
+                                            bookmaker= self.bookmaker_table[bookmaker['key']], update_time= update_time,
+                                            api_specific_data= {self: {**outcome, **{'market_key': market['key']}}}))
 
                 elif market['key'] in ['draw_no_bet', 'spreads']:
                     bet_type = BetType.AsianHandicap
@@ -263,16 +280,14 @@ class TheOddsAPI_V4(BaseAPI):
                         elif market['key'] == 'spreads':
                             value += ' ' + str(outcome['point'])
 
-                        compatible_event.add_bet(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
-                                                                    bookmaker= self.bookmaker_table[bookmaker['key']],
-                                                                    update_time= update_time, api_specific_data= {self: outcome}))
+                        bets.append(UserBet(bet_type= bet_type, value= value, odds= outcome['price'],
+                                            bookmaker= self.bookmaker_table[bookmaker['key']], update_time= update_time,
+                                            api_specific_data= {self: {**outcome, **{'market_key': market['key']}}}))
 
                 else:
                     raise Exception(f'Unknown market: {market}')
 
-        compatible_event.api_specific_data[self] = self.extract_specific_data(response)
-
-        return compatible_event
+        return bets
 
     def read_event_comparison_data(self, event: UserEvent) -> Tuple[str, str, str, str]: 
         return (self.name,

@@ -2,9 +2,10 @@ import json
 
 from betting_event import Bookmaker
 
+DEFAULTS = json.load(open("settings/event_defaults.json", "r"))["bookmaker"]
+
 
 class UserBookmaker(Bookmaker):
-    DEFAULTS = json.load(open("settings/event_defaults.json", "r"))["bookmaker"]
 
     def __init__(self,
                  name: str,
@@ -12,10 +13,11 @@ class UserBookmaker(Bookmaker):
                  balance: float = DEFAULTS['balance'], 
                  percent_of_balance: float = DEFAULTS['percent_of_balance'],
                  ignore_wager_precision: bool = DEFAULTS['ignore_wager_precision'],
-                 max_wager_count: int = DEFAULTS['max_wager_count']
+                 max_wager_count: int = DEFAULTS['max_wager_count'],
+                 lowest_valid_wager: float = DEFAULTS['lowest_valid_wager']
                 ) -> None:
 
-        super().__init__(commission, wager_limit=balance*percent_of_balance, ignore_wager_precision= ignore_wager_precision, max_wager_count= max_wager_count)
+        super().__init__(commission, wager_limit=balance*percent_of_balance, ignore_wager_precision= ignore_wager_precision, max_wager_count= max_wager_count, lowest_valid_wager= lowest_valid_wager)
 
         self.name = name
         self.balance = balance
@@ -41,7 +43,8 @@ class UserBookmaker(Bookmaker):
                 "balance": self.balance,
                 "percent_of_balance": self.percent_of_balance,
                 "ignore_wager_precision": self.ignore_wager_precision,
-                "max_wager_count": self.max_wager_count
+                "max_wager_count": self.max_wager_count,
+                "lowest_valid_wager": self.lowest_valid_wager,
             }
         else:
             return super().as_dict()
